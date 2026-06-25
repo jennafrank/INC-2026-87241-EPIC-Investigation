@@ -1,0 +1,55 @@
+// ============================================================
+// QUERY: Power Automate Mail Forward API Detection
+// Incident: INC-2026-87241
+// Table: MicrosoftGraphActivityLogs
+// Purpose: Detect automated email forwarding via the Graph API
+//          /forward endpoint, executed by Power Automate service
+//          principals. This is a persistence and exfiltration
+//          technique that survives password reset.
+// Platform: Microsoft Sentinel
+// ============================================================
+
+MicrosoftGraphActivityLogs
+| where RequestUri contains "/forward"
+| where ResponseStatusCode == 202
+| where TimeGenerated >= ago(24h)
+| project TimeGenerated, RequestUri, IPAddress
+
+// ============================================================
+// INCIDENT CONTEXT:
+//   - Compromised User:       m.smith@lognpacific.org
+//   - Flow Created:           2026-06-10 23:05:05 UTC
+//   - Forward Executed:       2026-06-11 07:41:09 UTC (9+ hrs after breach)
+//   - Execution IP:           20.150.129.194 (Microsoft O365 datacenter — NOT attacker)
+//   - Service Principal:      7ab7862c-4c57-491e-8a45-d52a7e023983 (Power Automate)
+//   - Response Code:          202 (Accepted)
+//   - Exfiltration Target:    merovingian1337@proton.me
+//   - Email Subject Forwarded: "FW: Updated Banking Details - Pacific IT Monthly"
+//
+// WHY THIS IS DANGEROUS:
+//   1. Attacker does NOT need to be logged in — flow runs automatically
+//   2. Source IP is Microsoft infrastructure — looks like legitimate mail
+//   3. Survives password reset — runs as service principal, not user
+//   4. Captures ALL future emails — incident response comms, credential resets
+//   5. Hard to detect — not a user action, requires MicrosoftGraphActivityLogs
+//
+// DETECTION SEQUENCE (two-table correlation):
+//   - MicrosoftGraphActivityLogs: POST /forward API call (202 Accepted)
+//   - OfficeActivity: Resulting Send operation recorded moments later
+//   The Graph call fires FIRST, then OfficeActivity captures the mail event.
+//   Correlate these two events to confirm automated forwarding.
+//
+// COMPANION QUERY — Detect Power Automate Flow Creation:
+//
+//   CloudAppEvents
+//   | where ActionType == "CreateFlow"
+//   | where Timestamp >= ago(7d)
+//   | project Timestamp, AccountObjectId, ActionType, ObjectName
+//
+// TUNING:
+//   - Alert on /forward API calls from service principals (not user accounts)
+//   - Alert on /forward API calls where target is external email domain
+//   - Correlate CreateFlow events with subsequent /forward API calls
+//   - Monitor Power Automate Admin Center for unexpected cloud flows
+//   - AppId 7ab7862c-4c57-491e-8a45-d52a7e023983 = Power Automate service principal
+// ============================================================

@@ -1,0 +1,46 @@
+// ============================================================
+// QUERY: Graph API Reconnaissance Pattern Detection
+// Incident: INC-2026-87241
+// Table: MicrosoftGraphActivityLogs
+// Purpose: Detect pre-authentication MFA posture profiling and
+//          group membership enumeration via Microsoft Graph API.
+//          These calls were made by the attacker BEFORE the breach
+//          to identify MFA gaps and org structure.
+// Platform: Microsoft Sentinel
+// ============================================================
+
+MicrosoftGraphActivityLogs
+| where RequestUri contains "/reports/authenticationMethods/userRegistrationDetails"
+   or RequestUri contains "/me/memberOf"
+| where TimeGenerated >= ago(24h)
+| summarize ReconCount = count() by IPAddress, RequestUri
+| where ReconCount > 2
+
+// ============================================================
+// INCIDENT CONTEXT:
+//   - Attacker IP:        103.69.224.136 (Amsterdam, NL)
+//   - Recon Window:       2026-06-10 22:09:37 – 22:12:26 UTC
+//
+//   CALL 1 — MFA Posture Profiling (3 calls):
+//     RequestUri: /beta/reports/authenticationMethods/userRegistrationDetails
+//     Filter:     userPrincipalName eq 'm.smith@lognpacific.org' and isMfaCapable eq true
+//     Purpose:    Check if m.smith has MFA registered
+//     Finding:    m.smith IS MFA-capable, but legacy auth path doesn't enforce it
+//
+//   CALL 2 — Group Membership Enumeration:
+//     RequestUri: /v1.0/users/fa5020a1-0d42-4839-bbfe-22db0861ced5/memberOf/microsoft.graph.group/$count
+//     Purpose:    Discover what security groups m.smith belongs to
+//     Finding:    Payment approval groups, finance teams, delegation chains
+//
+// WHY THIS MATTERS:
+//   The attacker used Graph API to profile the target BEFORE attempting
+//   authentication. This is sophisticated pre-attack reconnaissance that
+//   most orgs do not alert on. Detecting these patterns early can provide
+//   up to 4 minutes of advance warning before the breach.
+//
+// TUNING:
+//   - Adjust ReconCount threshold based on legitimate API usage patterns
+//   - Scope to external/unexpected IPs for reduced noise
+//   - Consider correlating with subsequent SigninLogs activity from same IP
+//   - Add /beta/users/ and /me/transitiveMemberOf/ as additional recon indicators
+// ============================================================

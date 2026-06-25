@@ -1,0 +1,50 @@
+// ============================================================
+// QUERY: Cloud File Exfiltration Detection (Read vs. Copy)
+// Incident: INC-2026-87241
+// Table: CloudAppEvents
+// Purpose: Detect targeted file downloads (exfiltration) from
+//          cloud storage by distinguishing FileDownloaded events
+//          (copy-out) from FileAccessed events (read in place).
+//          In this incident, the attacker downloaded 3 critical files
+//          in a 1-second window.
+// Platform: Microsoft Sentinel / Defender XDR
+// ============================================================
+
+CloudAppEvents
+| where ActionType == "FileDownloaded"
+| where ObjectName contains "credential"
+   or ObjectName contains "banking"
+   or ObjectName contains "password"
+   or ObjectName contains "vpn"
+   or ObjectName contains "key"
+| where Timestamp >= ago(7d)
+| summarize DownloadCount = count() by AccountObjectId, ObjectName, Timestamp
+
+// ============================================================
+// INCIDENT CONTEXT:
+//   - Compromised User:   m.smith@lognpacific.org
+//   - User ObjectId:      fa5020a1-0d42-4839-bbfe-22db0861ced5
+//   - Exfil Window:       2026-06-10 22:37:22 – 22:37:23 UTC (1 second)
+//
+//   FILES EXFILTRATED:
+//     1. VPN-Access-Credentials.txt  (22:37:22 UTC) — On-prem access
+//     2. Vendor-Banking-Details.txt  (22:37:22 UTC) — BEC intelligence
+//     3. Book.xlsx                   (22:37:23 UTC) — Financial records
+//
+// KEY DISTINCTION:
+//   FileAccessed = opened file in place (normal user behavior)
+//   FileDownloaded = copied file to local system (potential exfiltration)
+//
+//   These events look identical in many SIEM views. You MUST filter
+//   specifically for FileDownloaded to catch exfiltration. A high volume
+//   of FileDownloaded events (especially in rapid succession) or downloads
+//   of files with sensitive names should trigger high-priority alerts.
+//
+// TUNING:
+//   - Extend ObjectName filters for your org's naming conventions
+//   - Add a time-window cluster to detect rapid bulk downloads (multiple
+//     FileDownloaded events within 60 seconds from same AccountObjectId)
+//   - Consider baselining normal download frequency per user and alerting
+//     on significant deviations
+//   - Scope to users with payment/finance/admin access for higher signal
+// ============================================================

@@ -1,0 +1,72 @@
+# ============================================================
+# .gitignore — INC-2026-87241 Investigation Repository
+# ============================================================
+
+# ---- Secrets & Credentials --------------------------------
+*.env
+*.secret
+*.key
+*.pem
+*.pfx
+*.p12
+*.crt
+*.cer
+secrets/
+credentials/
+.secrets/
+
+# ---- API Keys & Tokens ------------------------------------
+api_keys.txt
+tokens.txt
+auth.json
+service_account*.json
+
+# ---- Local Investigation Notes (Private) ------------------
+*.local
+*.private
+*_personal.*
+private/
+local/
+.local/
+
+# ---- OS Junk ----------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ---- Editor Artifacts -------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+
+# ---- Log Files (may contain PII/sensitive data) -----------
+*.log
+logs/
+
+# ---- Exported Data (raw, potentially sensitive) -----------
+# Uncomment if you don't want CSV exports committed:
+# *.csv
+
+# ---- Python / Virtual Envs --------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+venv/
+env/
+.venv/
+
+# ---- Node / npm -------------------------------------------
+node_modules/
+npm-debug.log*
+
+# ---- Jupyter Notebooks (may cache sensitive data) ---------
+.ipynb_checkpoints/
