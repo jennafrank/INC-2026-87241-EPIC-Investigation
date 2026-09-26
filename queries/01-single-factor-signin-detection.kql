@@ -1,0 +1,33 @@
+// ============================================================
+// QUERY: Single-Factor Sign-in Detection
+// Incident: INC-2026-87241
+// Table: SigninLogs
+// Purpose: Detect successful single-factor sign-ins from outside
+//          trusted networks. The attacker gained access as
+//          m.smith@lognpacific.org with browser sign-ins that no
+//          Conditional Access policy covered.
+// Platform: Microsoft Sentinel
+// ============================================================
+
+SigninLogs
+| where AuthenticationRequirement == "singleFactorAuthentication"
+| where IPAddress !in ("LIST_OF_TRUSTED_CORPORATE_IPS")   // Replace with actual trusted IP list
+| where UserPrincipalName contains "@lognpacific.org"
+| summarize SigninCount = count() by UserPrincipalName, IPAddress, AppDisplayName
+| where SigninCount > 5
+
+// ============================================================
+// INCIDENT CONTEXT:
+//   - Attacker IP:        103.69.224.136 (Amsterdam, NL)
+//   - First success:      2026-06-11 03:14:38 UTC, One Outlook Web
+//   - ClientAppUsed:      Browser (modern sign-in, not legacy auth)
+//   - Auth Requirement:   singleFactorAuthentication
+//   - CA status:          notApplied; only Security Defaults evaluated
+//   - Session:            270 of 284 records share one session ID
+//
+// TUNING:
+//   - Replace "LIST_OF_TRUSTED_CORPORATE_IPS" with actual trusted IP ranges
+//   - Adjust SigninCount threshold based on environment baseline
+//   - Consider alerting on ANY singleFactorAuthentication from external IPs
+//   - Consider adding ResultType == "0" to focus on successful sign-ins
+// ============================================================

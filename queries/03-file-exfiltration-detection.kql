@@ -24,12 +24,12 @@ CloudAppEvents
 // INCIDENT CONTEXT:
 //   - Compromised User:   m.smith@lognpacific.org
 //   - User ObjectId:      fa5020a1-0d42-4839-bbfe-22db0861ced5
-//   - Exfil Window:       2026-06-10 22:37:22 – 22:37:23 UTC (1 second)
+//   - Exfil Window:       2026-06-11 03:37:22 – 03:37:23 UTC (1 second)
 //
 //   FILES EXFILTRATED:
-//     1. VPN-Access-Credentials.txt  (22:37:22 UTC) — On-prem access
-//     2. Vendor-Banking-Details.txt  (22:37:22 UTC) — BEC intelligence
-//     3. Book.xlsx                   (22:37:23 UTC) — Financial records
+//     1. VPN-Access-Credentials.txt  (03:37:22 UTC): On-prem access
+//     2. Vendor-Banking-Details.txt  (03:37:22 UTC): BEC intelligence
+//     3. Book.xlsx                   (03:37:23 UTC): Financial records
 //
 // KEY DISTINCTION:
 //   FileAccessed = opened file in place (normal user behavior)

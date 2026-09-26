@@ -3,7 +3,7 @@
 // Incident: INC-2026-87241
 // Table: OfficeActivity
 // Purpose: Detect creation of Exchange inbox rules that archive,
-//          delete, or hide emails — a common attacker technique
+//          delete, or hide emails: a common attacker technique
 //          for suppressing incident response communications and
 //          hiding BEC activity from the compromised user.
 // Platform: Microsoft Sentinel
@@ -19,23 +19,23 @@ OfficeActivity
 // INCIDENT CONTEXT:
 //   - Compromised User:   m.smith@lognpacific.org
 //
-//   RULE 1 — "Invoice Processing" (Created 22:28:22 UTC):
+//   RULE 1: "Invoice Processing" (Created 03:28:22 UTC):
 //     Trigger:  FROM j.reynolds@lognpacific.org (CFO)
 //     Action:   MoveToFolder → Archive
 //     Stop:     StopProcessingRules = True
 //     Purpose:  Auto-hide CFO's responses to the BEC email.
 //               The CFO's warnings/corrections are invisible to m.smith.
 //
-//   RULE 2 — "Backup Copy" (Created 22:32:31 UTC):
-//     Details:  Partial capture — additional hiding mechanism
+//   RULE 2: "Backup Copy" (Created 03:32:31 UTC):
+//     Details:  Partial capture: additional hiding mechanism
 //
 //   CRITICAL DETAIL:
-//     Rule 1 was created BEFORE the BEC email was sent (23:13 UTC).
+//     Rule 1 was created BEFORE the BEC email was sent (04:13 UTC).
 //     The attacker prepared the cover-up 45 minutes before the attack.
 //     This demonstrates premeditated operational security planning.
 //
 // DETECTION LOGIC NOTES:
-//   - The Item field in OfficeActivity is JSON — use parse_json() to extract:
+//   - The Item field in OfficeActivity is JSON: use parse_json() to extract:
 //       extend ItemData = parse_json(Item)
 //       | project RuleName = tostring(ItemData.Name),
 //                 Conditions = tostring(ItemData.Conditions),
@@ -43,7 +43,7 @@ OfficeActivity
 //
 //   - High-value alert tuning: ANY inbox rule that targets a specific named
 //     sender (especially an executive/manager) AND moves to Archive is
-//     extremely suspicious — this almost never has a legitimate purpose.
+//     extremely suspicious: this almost never has a legitimate purpose.
 //
 // TUNING:
 //   - Add alert for rules where trigger = a specific named sender

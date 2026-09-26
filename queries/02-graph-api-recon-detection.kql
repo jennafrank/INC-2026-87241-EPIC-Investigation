@@ -19,15 +19,15 @@ MicrosoftGraphActivityLogs
 // ============================================================
 // INCIDENT CONTEXT:
 //   - Attacker IP:        103.69.224.136 (Amsterdam, NL)
-//   - Recon Window:       2026-06-10 22:09:37 – 22:12:26 UTC
+//   - Recon Window:       2026-06-11 03:09:37 – 03:12:26 UTC
 //
-//   CALL 1 — MFA Posture Profiling (3 calls):
+//   CALL 1: MFA Posture Profiling (3 calls):
 //     RequestUri: /beta/reports/authenticationMethods/userRegistrationDetails
 //     Filter:     userPrincipalName eq 'm.smith@lognpacific.org' and isMfaCapable eq true
 //     Purpose:    Check if m.smith has MFA registered
-//     Finding:    m.smith IS MFA-capable, but legacy auth path doesn't enforce it
+//     Returns:    m.smith's MFA registration status (the logs show the requests, not what the actor concluded)
 //
-//   CALL 2 — Group Membership Enumeration:
+//   CALL 2: Group Membership Enumeration:
 //     RequestUri: /v1.0/users/fa5020a1-0d42-4839-bbfe-22db0861ced5/memberOf/microsoft.graph.group/$count
 //     Purpose:    Discover what security groups m.smith belongs to
 //     Finding:    Payment approval groups, finance teams, delegation chains

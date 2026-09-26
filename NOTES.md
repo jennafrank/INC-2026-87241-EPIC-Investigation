@@ -1,4 +1,4 @@
-# INCIDENT 87241 — COMPREHENSIVE HUNT NOTES
+# INCIDENT 87241: COMPREHENSIVE HUNT NOTES
 ## Cloud Identity Compromise & Business Email Compromise (BEC)
 
 **Date:** June 25, 2026  
@@ -6,9 +6,12 @@
 **Organization:** LOG(N) Pacific  
 **Platform:** Microsoft Sentinel (law-cyber-range workspace)  
 **Investigation Window:** June 10-11, 2026 (primary); June 10-20, 2026 (full scope)  
+**Times:** These notes use US Central Daylight Time (UTC−5), as displayed in the portal during the hunt. Where a UTC column appears, it gives the UTC time. The README uses UTC throughout.  
 **Incident ID:** ad76cdddcd4de3a19d87770207112ccd0cb7c54ec6
 
 ---
+
+> **Correction (later log review):** These are working notes from the hunt. A later review of `SigninLogs` and `AADNonInteractiveUserSignInLogs` found that the attacker's successful sign-ins were **browser sign-ins, not legacy authentication**. No Conditional Access policy applied (`notApplied`); the tenant relied on Security Defaults, which did not require MFA for those sign-ins. Where MFA was required (13 attempts), it blocked every one. The "583 sign-ins", "legacy auth bypass" and "90-day refresh token" statements below are superseded. The [README](README.md) has the verified figures.
 
 ## TABLE OF CONTENTS
 1. [Hunt Overview](#hunt-overview)
@@ -17,12 +20,11 @@
 4. [Attack Phase Breakdown](#attack-phase-breakdown)
 5. [Schema & Table Discovery](#schema--table-discovery)
 6. [Query Patterns & KQL Techniques](#query-patterns--kql-techniques)
-7. [Flag Answers (Q01-Q37)](#flag-answers-q01-q37)
-8. [Attack Timeline (Detailed)](#attack-timeline-detailed)
-9. [Threat Actor TTPs](#threat-actor-ttps)
-10. [Forensic Evidence](#forensic-evidence)
-11. [Containment Sequencing](#containment-sequencing)
-12. [Lessons Learned](#lessons-learned)
+7. [Attack Timeline (Detailed)](#attack-timeline-detailed)
+8. [Threat Actor TTPs](#threat-actor-ttps)
+9. [Forensic Evidence](#forensic-evidence)
+10. [Containment Sequencing](#containment-sequencing)
+11. [Lessons Learned](#lessons-learned)
 
 ---
 
@@ -96,7 +98,7 @@ The alert came in at "Informational" severity because:
 |------|---|---|---|
 | mohammed_admin@lognpacific.com | 10:08-10:10 PM Jun 10 | 103.69.224.136 | Azure Portal, ADIbizaUX, Security Copilot |
 
-**Significance:** Same source IP, same timeframe, indicates **broader admin compromise** — attacker was actively breaching multiple admin accounts.
+**Significance:** Same source IP, same timeframe, indicates **broader admin compromise**: attacker was actively breaching multiple admin accounts.
 
 ---
 
@@ -115,7 +117,7 @@ Query: /beta/reports/authenticationMethods/userRegistrationDetails
 Filter: userPrincipalName eq 'm.smith@lognpacific.org' and isMfaCapable eq true
 Timestamp: 10:09:37 PM, 10:10:07 PM, 10:12:26 PM (3 calls)
 Purpose: Check if m.smith has MFA registered
-Result: YES — m.smith is MFA-capable but vulnerability: legacy auth paths don't enforce it
+Result: YES: m.smith is MFA-capable but vulnerability: legacy auth paths don't enforce it
 ```
 
 **KQL Query Used:**
@@ -131,7 +133,7 @@ MicrosoftGraphActivityLogs
 **What This Tells Us:**
 - Attacker conducting **passive reconnaissance** before active attacks
 - They identified m.smith as a **valid target** (MFA-capable but potentially bypassable)
-- They know how to use **Graph API authentication endpoints** — sophisticated threat actor
+- They know how to use **Graph API authentication endpoints**: sophisticated threat actor
 
 #### Sub-Phase 1B: Group Membership Enumeration
 
@@ -143,7 +145,7 @@ Result: Learn about payment approval groups, finance teams, delegation chains
 
 **Why This Matters:**
 - Attacker wants to know: *Who can approve payments? What groups give access?*
-- Part of **initial targeting** — understand organizational structure
+- Part of **initial targeting**: understand organizational structure
 
 #### Sub-Phase 1C: Secondary Admin Reconnaissance
 
@@ -196,7 +198,7 @@ This is **the breach**. The attacker obtained a valid **refresh token** that wil
 **Why This Succeeded (Root Cause):**
 1. **Legacy OAuth client** (One Outlook Web) is NOT subject to modern Conditional Access policies
 2. **Security Defaults** enforce MFA, but only on *modern* auth flows
-3. Legacy clients have an **exempt authentication path** — they only require password
+3. Legacy clients have an **exempt authentication path**: they only require password
 4. Attacker exploited this **legacy authentication gap**
 
 **KQL Query to Find This:**
@@ -210,7 +212,7 @@ SigninLogs
 | project TimeGenerated, AuthenticationRequirement, ClientAppId, CorrelationId
 ```
 
-**Critical Detail:** `AuthenticationRequirement == "singleFactorAuthentication"` — this is the smoking gun.
+**Critical Detail:** `AuthenticationRequirement == "singleFactorAuthentication"`: this is the smoking gun.
 
 ---
 
@@ -220,12 +222,12 @@ SigninLogs
 
 **Timeline:**
 ```
-10:35:11 PM — PageViewed: OneDrive file browser
-10:37:20 PM — FileAccessed: Documents folder (2x)
-10:37:20 PM — ListViewed: Folder listings
-10:37:22 PM — FileDownloaded: VPN-Access-Credentials.txt
-10:37:22 PM — FileDownloaded: Vendor-Banking-Details.txt
-10:37:23 PM — FileDownloaded: Book.xlsx
+10:35:11 PM: PageViewed: OneDrive file browser
+10:37:20 PM: FileAccessed: Documents folder (2x)
+10:37:20 PM: ListViewed: Folder listings
+10:37:22 PM: FileDownloaded: VPN-Access-Credentials.txt
+10:37:22 PM: FileDownloaded: Vendor-Banking-Details.txt
+10:37:23 PM: FileDownloaded: Book.xlsx
 ```
 
 **CloudAppEvents Query:**
@@ -242,13 +244,13 @@ CloudAppEvents
 
 1. **VPN-Access-Credentials.txt**
    - Content: VPN authentication tokens, server addresses, pre-shared keys
-   - Significance: **CRITICAL** — gives attacker access to internal network
+   - Significance: **CRITICAL**: gives attacker access to internal network
    - Implication: On-premises compromise is now possible
    - Threat level: Escalates from cloud-only to hybrid infrastructure attack
 
 2. **Vendor-Banking-Details.txt**
    - Content: Vendor account numbers, payment routing information, bank details
-   - Significance: **INTELLIGENCE FOR BEC** — attacker learns how payments are structured
+   - Significance: **INTELLIGENCE FOR BEC**: attacker learns how payments are structured
    - Use: Craft convincing fraudulent payment request to CFO
    - Timing: Downloaded right before 11:13 PM BEC email
 
@@ -258,8 +260,8 @@ CloudAppEvents
 
 **Why This Exfiltration Matters:**
 - Attacker went from **opportunistic access** to **targeted intelligence gathering**
-- Downloaded files **within 1 minute** (10:37:22-10:37:23) — coordinated, not exploratory
-- Selected files **by name** — knew where to look (pre-recon paid off)
+- Downloaded files **within 1 minute** (10:37:22-10:37:23): coordinated, not exploratory
+- Selected files **by name**: knew where to look (pre-recon paid off)
 
 ---
 
@@ -296,7 +298,7 @@ OfficeActivity
 - Attacker preparing the **cover-up** before the attack
 - Rule targets **exactly the CFO** who will receive the fraudulent request
 - **Brilliant social engineering:** CFO's corrections/warnings hidden by automated rule
-- Attacker understands **email workflow** — knows replies will come
+- Attacker understands **email workflow**: knows replies will come
 
 ---
 
@@ -324,15 +326,15 @@ CloudAppEvents
 
 **What This Flow Does:**
 - Configured to automatically **forward emails** from m.smith's mailbox
-- Executes **without user interaction** — runs as a scheduled automation
+- Executes **without user interaction**: runs as a scheduled automation
 - Service Principal **7ab7862c-4c57-491e-8a45-d52a7e023983** = Power Automate application identity
 - Target: Send copies to attacker's exfil email (merovingian1337@proton.me)
 
 **Why Create This Flow?**
 - **Persistent access** after attacker logs off
-- **Captures all future emails** — payment approvals, internal discussions, credential resets
-- **Survives password reset** — flow still runs with service principal
-- **Defeats MFA** — no authentication needed; runs programmatically
+- **Captures all future emails**: payment approvals, internal discussions, credential resets
+- **Survives password reset**: flow still runs with service principal
+- **Defeats MFA**: no authentication needed; runs programmatically
 
 ---
 
@@ -363,14 +365,14 @@ OfficeActivity
 ```
 
 **Why This Email Works:**
-1. **Sender = m.smith** (trusted finance colleague) — not external/suspicious
-2. **Recipient = j.reynolds** (CFO) — decision maker who approves payments
-3. **Subject = Banking Details** — vague, plausible, matches exfiltrated file ("Vendor-Banking-Details.txt")
-4. **Content = Professional** — attacker crafted it to look like internal communication
-5. **Timing = Right context** — sent 4 minutes after vendor banking details were reviewed
-6. **Inbox rule already set** — j.reynolds' replies will be auto-archived (hidden from m.smith)
+1. **Sender = m.smith** (trusted finance colleague): not external/suspicious
+2. **Recipient = j.reynolds** (CFO): decision maker who approves payments
+3. **Subject = Banking Details**: vague, plausible, matches exfiltrated file ("Vendor-Banking-Details.txt")
+4. **Content = Professional**: attacker crafted it to look like internal communication
+5. **Timing = Right context**: sent 4 minutes after vendor banking details were reviewed
+6. **Inbox rule already set**: j.reynolds' replies will be auto-archived (hidden from m.smith)
 
-**Email Subject Line (Answer to Q14):**
+**Email Subject Line:**
 ```
 "Updated Banking Details - Pacific IT Monthly"
 ```
@@ -648,173 +650,6 @@ OfficeActivity
 
 ---
 
-## FLAG ANSWERS (Q01-Q37)
-
-### Q01 — Compromised Principal
-**Question:** Who was compromised?  
-**Answer:** `m.smith@lognpacific.org`  
-**Evidence:** Entra ID Identity Protection alert, AccountUpn in AADSignInEventsBeta
-
-### Q02 — Flagged Source IP
-**Question:** What IP triggered the alert?  
-**Answer:** `103.69.224.136`  
-**Evidence:** SigninLogs.IPAddress for successful 10:13:10 PM sign-in
-
-### Q03 — Client OS
-**Question:** What OS was the attacker using?  
-**Answer:** `Linux`  
-**Evidence:** User-Agent string in AADSignInEventsBeta: "Mozilla/5.0 (X11; Linux x86_64)"
-
-### Q04 — Stored Detection Type
-**Question:** What was the Entra ID detection type?  
-**Answer:** `anonymizedIPAddress`  
-**Evidence:** AADUserRiskEvents.RiskEventType field
-
-### Q05 — Risk State Majority
-**Question:** What risk state did most risk events have?  
-**Answer:** `dismissed`  
-**Evidence:** AADUserRiskEvents RiskState: 6x dismissed, 1x atRisk
-
-### Q06 — Account Status
-**Question:** (Pending — check Assets tab in Incident 87241 in Defender XDR)
-
-### Q07 — How Session Beat MFA
-**Question:** What auth requirement let the attacker in?  
-**Answer:** `singleFactorAuthentication`  
-**Evidence:** AADSignInEventsBeta.AuthenticationRequirement at 10:13:10 PM sign-in
-
-### Q08 — First Successful App
-**Question:** Which app first let the attacker in successfully?  
-**Answer:** `One Outlook Web`  
-**Evidence:** OfficeActivity ErrorCode 0 (success) at 22:13:10, after failed Microsoft Office attempts
-
-### Q09 — Bad-Password Failures
-**Question:** How many failed password attempts before breach?  
-**Answer:** `2`  
-**Evidence:** SigninLogs ErrorCode 50126 at 9:21:32 PM and 9:21:52 PM (same day)
-
-### Q10 — Distinct Apps in Session
-**Question:** How many different M365 apps did the attacker access?  
-**Answer:** `7`  
-**Evidence:** SigninLogs dcount(AppDisplayName) where ResultType == 0, IPAddress == "103.69.224.136"
-
-### Q11 — Session GUID
-**Question:** What's the compromised session ID?  
-**Answer:** `005d431a-380b-1f5e-e554-16d5010dc28e`  
-**Evidence:** Appears across SigninLogs, GraphAPIAuditEvents, CloudAppEvents, OfficeActivity
-
-### Q12 — MFA Posture Profiling Resource
-**Question:** What Graph API endpoint profiled MFA capability?  
-**Answer:** `userRegistrationDetails`  
-**Evidence:** MicrosoftGraphActivityLogs RequestUri contains "/beta/reports/authenticationMethods/userRegistrationDetails"
-
-### Q13 — Group Enumeration Path
-**Question:** (Pending — `/me/memberOf` pattern in Graph calls)
-
-### Q14 — Fraudulent Email Subject
-**Question:** What was the BEC email subject?  
-**Answer:** `Updated Banking Details - Pacific IT Monthly`  
-**Evidence:** OfficeActivity Send operation, Item field (JSON), Subject field
-
-### Q15 — Thread They Mined
-**Question:** What older email thread did attacker read for intel?  
-**Answer:** `Vendor Payment Schedule - Review Required`  
-**Evidence:** EmailEvents table, pre-intrusion timeframe, discusses payment approval process
-
-### Q16 — Fraud Target
-**Question:** Who received the fraudulent email?  
-**Answer:** `j.reynolds@lognpacific.org`  
-**Evidence:** OfficeActivity Send operation, Item.Recipients field
-
-### Q17 — Second Channel Reinforcement
-**Question:** What service carried the secondary attack message?  
-**Answer:** `Microsoft Teams`  
-**Evidence:** OfficeActivity MessageSent operation at 11:17:56 PM
-
-### Q18 — Concealment Rule
-**Question:** What inbox rule hid evidence?  
-**Answer:** `Invoice Processing`  
-**Evidence:** OfficeActivity New-InboxRule, MoveToFolder = Archive, Trigger FROM j.reynolds
-
-### Q19-Q21 — (Not documented in final answers)
-
-### Q22 — The Exfil Operation
-**Question:** What operation represents file copy-out?  
-**Answer:** `FileDownloaded`  
-**How Distinguished:** CloudAppEvents separates `FileAccessed` (reading in place) from `FileDownloaded` (actual copy-out). Normal user pattern = `FileAccessed`; exfiltration pattern = `FileDownloaded`. The three downloads occurred in rapid succession (10:37:22-10:37:23 PM) immediately after reconnaissance, indicating intentional targeted file theft.
-
-### Q23 — (Unknown)
-
-### Q24 — The Credential Document
-**Question:** Which exfiltrated file extends compromise past the mailbox?  
-**Answer:** `VPN-Access-Credentials.txt`  
-**Evidence:** Gives access to on-premises infrastructure, not just cloud
-
-### Q25 — The Vault Pointer
-**Question:** (Pending — file accessed but not downloaded, points to credential store)
-
-### Q26 — Disprove the Innocent Explanation
-**Question:** How many times was MFA actually satisfied?  
-**Answer:** `0`  
-**Evidence:** Initial sign-in at 10:13:10 PM used singleFactorAuthentication; all 583 subsequent sign-ins reused the session token without re-authenticating. AuthenticationRequirement field in later sign-ins shows "multiFactorAuthentication" required, but actual MFA completion never occurred.
-
-### Q27 — Catch the Plant
-**Question:** What app is for building automation, not finance work?  
-**Answer:** `Microsoft Flow Portal`  
-**Evidence:** CloudAppEvents ActionType == "CreateFlow" accessed during compromise; not a typical finance app
-
-### Q28 — The Cause Behind the Forward
-**Question:** What table records the API call that created the forward?  
-**Answer:** `MicrosoftGraphActivityLogs`  
-**Evidence:** Graph API call to /me/messages/{id}/forward with 202 response code
-
-### Q29 — Prove It With the Sequence
-**Question:** Which came first: the Graph API call or the mail event?  
-**Answer:** `Graph call` (API invocation came first)  
-**Evidence:** MicrosoftGraphActivityLogs 7:41:09 AM forward request executed, then OfficeActivity recorded the resulting mail send
-
-### Q30 — The Automation Source IP
-**Question:** What IP executed the forward (not attacker, not user)?  
-**Answer:** `20.150.129.194`  
-**Evidence:** MicrosoftGraphActivityLogs IPAddress field for forward API call
-
-### Q31 — The Automation Identity
-**Question:** What app/service principal made the forward call?  
-**Answer:** `7ab7862c-4c57-491e-8a45-d52a7e023983` (Power Automate AppId)  
-**Evidence:** Authentication error shows this is the service principal making the forward API call
-
-### Q32 — Name the Abused Service
-**Question:** Which M365 service was used to automate the forward?  
-**Answer:** `Power Automate`  
-**Evidence:** Q31 AppId resolves to Power Automate service; Q27 showed CreateFlow operation; flow executes the forward
-
-### Q33 — One Actor, Every Source
-**Question:** How many distinct log sources contain the attacker's IP?  
-**Answer:** `7`  
-**Evidence:** SigninLogs, CloudAppEvents, OfficeActivity, MicrosoftGraphActivityLogs, EmailEvents, IdentityLogonEvents, BehaviorAnalytics (but NOT AuditLogs, which has no IP field)
-
-### Q34 — Containment Ordering
-**Question:** What action comes first before deleting rules/flows?  
-**Answer:** `Revoke user sessions`  
-**Evidence:** Session token survives password reset; must revoke refreshtoken first, then delete flow (can recreate rules if executed), then delete rules
-
-### Q35 — Where the Flow Is Removed
-**Question:** What admin console to delete the Power Automate flow?  
-**Answer:** `Power Automate Admin Center`  
-**Evidence:** Power Automate flows are managed in this portal
-
-### Q36 — The Control That Never Fired
-**Question:** What did Conditional Access do on these sign-ins?  
-**Answer:** `Conditional Access not applied to legacy single-factor clients` / `Legacy auth paths bypassed policy`  
-**Evidence:** SigninLogs ConditionalAccessStatus shows policy not evaluated for One Outlook Web (legacy OAuth client); modern CA policies exempt legacy auth
-
-### Q37 — Why Revoke Before Reset
-**Question:** Why password reset alone doesn't lock out attacker?  
-**Answer:** `Session tokens survive password reset` / `Refresh tokens not invalidated by password change`  
-**Evidence:** Session token from 10:13:10 PM remains valid after password reset; Microsoft Entra ID requires explicit session revocation to invalidate refresh tokens
-
----
-
 ## ATTACK TIMELINE (DETAILED)
 
 ### June 10, 2026 Timeline
@@ -860,41 +695,41 @@ OfficeActivity
 ### MITRE ATT&CK Framework Mapping
 
 **Reconnaissance Phase:**
-- **T1598.003** — Phishing: Spearphishing Link (external breach led to this user/password)
-- **T1592.003** — Gather Victim Org Info: Identify roles, departments (graph API enumeration)
-- **T1087.004** — Account Discovery: Cloud Account (group/org enumeration via Graph)
-- **T1526** — Cloud Service Discovery (Azure Portal, Security Copilot access attempts)
+- **T1598.003**: Phishing: Spearphishing Link (external breach led to this user/password)
+- **T1592.003**: Gather Victim Org Info: Identify roles, departments (graph API enumeration)
+- **T1087.004**: Account Discovery: Cloud Account (group/org enumeration via Graph)
+- **T1526**: Cloud Service Discovery (Azure Portal, Security Copilot access attempts)
 
 **Weaponization & Initial Access:**
-- **T1110.004** — Brute Force: Credential Stuffing (password spray with leaked credentials)
-- **T1078.004** — Valid Accounts: Cloud Accounts (obtained valid m.smith credentials)
+- **T1110.004**: Brute Force: Credential Stuffing (password spray with leaked credentials)
+- **T1078.004**: Valid Accounts: Cloud Accounts (obtained valid m.smith credentials)
 
 **Exploitation & Privilege Escalation:**
-- **T1621** — Multi-Factor Authentication Interception or Bypass (legacy auth gap)
-- **T1550.001** — Use Alternate Authentication Material: Application Access Token (session token reuse)
+- **T1621**: Multi-Factor Authentication Interception or Bypass (legacy auth gap)
+- **T1550.001**: Use Alternate Authentication Material: Application Access Token (session token reuse)
 
 **Defense Evasion:**
-- **T1535** — Unused/Unsupported Cloud Regions (attempted Azure Portal, may be testing geo-restrictions)
-- **T1207** — Rogue Domain Controller (not applicable here)
-- **T1114.002** — Email Collection: Remote Email Collection (via inbox rules)
+- **T1535**: Unused/Unsupported Cloud Regions (attempted Azure Portal, may be testing geo-restrictions)
+- **T1207**: Rogue Domain Controller (not applicable here)
+- **T1114.002**: Email Collection: Remote Email Collection (via inbox rules)
 
 **Persistence:**
-- **T1098.001** — Account Manipulation: Additional Cloud Credentials (created inbox rules, flow)
-- **T1136.003** — Create Account: Cloud Account (created Power Automate flow as persistence)
-- **T1547.014** — Boot or Logon Autostart Execution: Emond (Power Automate flow auto-runs)
+- **T1098.001**: Account Manipulation: Additional Cloud Credentials (created inbox rules, flow)
+- **T1136.003**: Create Account: Cloud Account (created Power Automate flow as persistence)
+- **T1547.014**: Boot or Logon Autostart Execution: Emond (Power Automate flow auto-runs)
 
 **Collection:**
-- **T1114.002** — Email Collection: Remote Email Collection (mail forwarding rule)
-- **T1530** — Data from Cloud Storage (exfiltrated OneDrive files)
-- **T1537** — Transfer Data to Cloud Account (forwarded emails to external email)
+- **T1114.002**: Email Collection: Remote Email Collection (mail forwarding rule)
+- **T1530**: Data from Cloud Storage (exfiltrated OneDrive files)
+- **T1537**: Transfer Data to Cloud Account (forwarded emails to external email)
 
 **Exfiltration:**
-- **T1020.001** — Automated Exfiltration: Traffic Duplication (Power Automate mail forwarding)
-- **T1537** — Transfer Data to Cloud Account (emails to merovingian1337@proton.me)
+- **T1020.001**: Automated Exfiltration: Traffic Duplication (Power Automate mail forwarding)
+- **T1537**: Transfer Data to Cloud Account (emails to merovingian1337@proton.me)
 
 **Impact:**
-- **T1566.002** — Phishing: Spearphishing Link (BEC attack on CFO)
-- **T1586.003** — Compromise Accounts: Cloud Accounts (m.smith compromise impacts org)
+- **T1566.002**: Phishing: Spearphishing Link (BEC attack on CFO)
+- **T1586.003**: Compromise Accounts: Cloud Accounts (m.smith compromise impacts org)
 
 ---
 
@@ -906,7 +741,7 @@ OfficeActivity
 
 **Token Characteristics:**
 ```
-Issued: Jun 10, 2026, 22:13:10 UTC
+Issued: Jun 10, 2026, 22:13:10 CDT (Jun 11, 03:13:10 UTC)
 Issued By: One Outlook Web (legacy OAuth client)
 Auth Level: singleFactorAuthentication
 Refresh Token Lifetime: 90 days (default)
@@ -916,11 +751,11 @@ Reuse Window: 9+ hours
 ```
 
 **Why This Token Is Dangerous:**
-1. **Issued without MFA** — attacker didn't have to satisfy MFA
-2. **Valid for 90 days** — persists even after password reset
-3. **Reusable across apps** — works for Email, Teams, SharePoint, Graph API
-4. **No re-authentication** — doesn't require MFA prompt for subsequent operations
-5. **Can't be killed by password reset** — requires explicit session revocation
+1. **Issued without MFA**: attacker didn't have to satisfy MFA
+2. **Valid for 90 days**: persists even after password reset
+3. **Reusable across apps**: works for Email, Teams, SharePoint, Graph API
+4. **No re-authentication**: doesn't require MFA prompt for subsequent operations
+5. **Can't be killed by password reset**: requires explicit session revocation
 
 **Remediation Sequence:**
 ```
@@ -939,19 +774,19 @@ Step 4: FORCE re-authentication (user logs in with new password)
 1. **VPN-Access-Credentials.txt**
    - Estimated Size: ~5-10 KB
    - Contents: Likely VPN certificate, pre-shared keys, VPN gateway addresses
-   - Impact: **CRITICAL** — On-premises access compromised
+   - Impact: **CRITICAL**: On-premises access compromised
    - Risk: Attacker can now reach internal servers, databases, file shares
 
 2. **Vendor-Banking-Details.txt**
    - Estimated Size: ~2-3 KB
    - Contents: Vendor account numbers, bank routing, payment instructions
-   - Impact: **CRITICAL** — Intelligence for fraudulent payment
+   - Impact: **CRITICAL**: Intelligence for fraudulent payment
    - Timing: Downloaded 36 minutes before BEC email sent (time to craft payload)
 
 3. **Book.xlsx**
    - Estimated Size: ~50-100 KB (typical spreadsheet)
    - Contents: Unknown (possibly financial records, payment history, internal contacts)
-   - Impact: **HIGH** — Additional leverage or intelligence
+   - Impact: **HIGH**: Additional leverage or intelligence
 
 **Exfiltration Method:** Direct download via Outlook Web interface (OneDrive sync)
 **Detection Opportunity:** CloudAppEvents FileDownloaded is the ONLY way to detect this (not FileAccessed)
@@ -971,7 +806,7 @@ Properties:
   Actions:
     - MoveToFolder: Archive
     - StopProcessingRules: True
-  Created: Jun 10, 22:28:22 UTC
+  Created: Jun 10, 22:28:22 CDT (Jun 11, 03:28:22 UTC)
   Created By: m.smith (attacker session)
 ```
 
@@ -1000,11 +835,11 @@ Response Status: 202 (Accepted)
 ```
 
 **Why This Is Dangerous:**
-1. **Runs without user logged in** — doesn't require attacker presence
-2. **Service principal execute** — Cloud infrastructure sends emails
-3. **Difficult to detect** — not a user action, hard to audit
-4. **Survives password reset** — token is service principal, not user token
-5. **Persistent** — continues forwarding all future emails indefinitely
+1. **Runs without user logged in**: doesn't require attacker presence
+2. **Service principal execute**: Cloud infrastructure sends emails
+3. **Difficult to detect**: not a user action, hard to audit
+4. **Survives password reset**: token is service principal, not user token
+5. **Persistent**: continues forwarding all future emails indefinitely
 
 **Detection:** CloudAppEvents CreateFlow, MicrosoftGraphActivityLogs forward API call
 **Remediation:** Delete flow in Power Automate Admin Center BEFORE resetting password
@@ -1054,17 +889,17 @@ Result: Flow still forwarding emails!
 
 **Example Timeline:**
 ```
-22:13:10 PM Jun 10 — Session token issued (refresh token valid 90 days)
-Jul 1 — Admin resets m.smith password (attacker still has token!)
-Jul 2 — Attacker uses old token → still works
-Jul 15 — Attacker obtains new refresh token using old token
-Aug 1 — Password is now old news; attacker still has multiple tokens
+22:13:10 PM Jun 10: Session token issued (refresh token valid 90 days)
+Jul 1: Admin resets m.smith password (attacker still has token!)
+Jul 2: Attacker uses old token → still works
+Jul 15: Attacker obtains new refresh token using old token
+Aug 1: Password is now old news; attacker still has multiple tokens
 
 vs.
 
-Jun 11 — Admin revokes all sessions (refresh token NOW INVALID)
-Jun 11 — Password reset (redundant, but complete)
-Jun 11 — Attacker tries old token → rejected
+Jun 11: Admin revokes all sessions (refresh token NOW INVALID)
+Jun 11: Password reset (redundant, but complete)
+Jun 11: Attacker tries old token → rejected
 Result: Attacker completely locked out
 ```
 
@@ -1076,7 +911,7 @@ Result: Attacker completely locked out
 
 1. **KQL Schema Precision**
    - **Gap:** Assuming column names are consistent across tables
-   - **Reality:** IPAddress, IpAddress, ClientIP, SourceIP — same concept, different names
+   - **Reality:** IPAddress, IpAddress, ClientIP, SourceIP: same concept, different names
    - **Fix:** ALWAYS run `TableName | take 1` before querying
    - **Drill:** Practice schema exploration on unknown tables
 
@@ -1159,7 +994,7 @@ Result: Attacker completely locked out
 ## HUNT STATISTICS
 
 ### Coverage
-- **Incident Window:** 9 hours (Jun 10, 10 PM — Jun 11, 7 AM)
+- **Incident Window:** 9 hours (Jun 10, 10 PM: Jun 11, 7 AM)
 - **Investigation Scope:** 10 days (Jun 10-20)
 - **Log Sources Queried:** 8 tables (SigninLogs, CloudAppEvents, OfficeActivity, MicrosoftGraphActivityLogs, EmailEvents, IdentityLogonEvents, BehaviorAnalytics, AuditLogs)
 - **Flags Answered:** 37 questions
@@ -1185,18 +1020,18 @@ Result: Attacker completely locked out
 
 ### Microsoft Documentation
 - [Revoke user access in an emergency in Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity/users/users-revoke-access)
-- [Conditional Access — Legacy Authentication](https://learn.microsoft.com/en-us/entra/identity/conditional-access/block-legacy-authentication)
-- [Microsoft Graph API — Mail Forwarding](https://learn.microsoft.com/en-us/graph/api/message-createforward)
+- [Conditional Access: Legacy Authentication](https://learn.microsoft.com/en-us/entra/identity/conditional-access/block-legacy-authentication)
+- [Microsoft Graph API: Mail Forwarding](https://learn.microsoft.com/en-us/graph/api/message-createforward)
 - [Power Automate Security Best Practices](https://learn.microsoft.com/en-us/power-automate/security)
 
 ### MITRE ATT&CK
-- [T1078.004 — Valid Accounts: Cloud Accounts](https://attack.mitre.org/techniques/T1078/004/)
-- [T1110.004 — Brute Force: Credential Stuffing](https://attack.mitre.org/techniques/T1110/004/)
-- [T1114.002 — Email Collection: Remote Email Collection](https://attack.mitre.org/techniques/T1114/002/)
-- [T1537 — Transfer Data to Cloud Account](https://attack.mitre.org/techniques/T1537/)
+- [T1078.004: Valid Accounts: Cloud Accounts](https://attack.mitre.org/techniques/T1078/004/)
+- [T1110.004: Brute Force: Credential Stuffing](https://attack.mitre.org/techniques/T1110/004/)
+- [T1114.002: Email Collection: Remote Email Collection](https://attack.mitre.org/techniques/T1114/002/)
+- [T1537: Transfer Data to Cloud Account](https://attack.mitre.org/techniques/T1537/)
 
 ### Threat Intelligence
-- [Octo Tempest — Microsoft Threat Intelligence Profile](https://learn.microsoft.com/en-us/security/threat-intelligence)
+- [Octo Tempest: Microsoft Threat Intelligence Profile](https://learn.microsoft.com/en-us/security/threat-intelligence)
 
 ---
 

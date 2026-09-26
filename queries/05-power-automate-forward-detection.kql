@@ -18,20 +18,20 @@ MicrosoftGraphActivityLogs
 // ============================================================
 // INCIDENT CONTEXT:
 //   - Compromised User:       m.smith@lognpacific.org
-//   - Flow Created:           2026-06-10 23:05:05 UTC
-//   - Forward Executed:       2026-06-11 07:41:09 UTC (9+ hrs after breach)
-//   - Execution IP:           20.150.129.194 (Microsoft O365 datacenter — NOT attacker)
+//   - Flow Created:           2026-06-11 04:05:05 UTC
+//   - Forward Executed:       2026-06-11 12:41:09 UTC (9+ hrs after first sign-in)
+//   - Execution IP:           20.150.129.194 (Microsoft O365 datacenter: NOT attacker)
 //   - Service Principal:      7ab7862c-4c57-491e-8a45-d52a7e023983 (Power Automate)
 //   - Response Code:          202 (Accepted)
 //   - Exfiltration Target:    merovingian1337@proton.me
 //   - Email Subject Forwarded: "FW: Updated Banking Details - Pacific IT Monthly"
 //
 // WHY THIS IS DANGEROUS:
-//   1. Attacker does NOT need to be logged in — flow runs automatically
-//   2. Source IP is Microsoft infrastructure — looks like legitimate mail
-//   3. Survives password reset — runs as service principal, not user
-//   4. Captures ALL future emails — incident response comms, credential resets
-//   5. Hard to detect — not a user action, requires MicrosoftGraphActivityLogs
+//   1. Attacker does NOT need to be logged in: flow runs automatically
+//   2. Source IP is Microsoft infrastructure: looks like legitimate mail
+//   3. Survives password reset: runs as service principal, not user
+//   4. Captures ALL future emails: incident response comms, credential resets
+//   5. Hard to detect: not a user action, requires MicrosoftGraphActivityLogs
 //
 // DETECTION SEQUENCE (two-table correlation):
 //   - MicrosoftGraphActivityLogs: POST /forward API call (202 Accepted)
@@ -39,7 +39,7 @@ MicrosoftGraphActivityLogs
 //   The Graph call fires FIRST, then OfficeActivity captures the mail event.
 //   Correlate these two events to confirm automated forwarding.
 //
-// COMPANION QUERY — Detect Power Automate Flow Creation:
+// COMPANION QUERY (detect Power Automate flow creation):
 //
 //   CloudAppEvents
 //   | where ActionType == "CreateFlow"
